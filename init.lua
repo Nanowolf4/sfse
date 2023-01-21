@@ -251,7 +251,6 @@ local function check_default_elements(project)
 end
 
 local function build_project(session_name)
-	print("yes")
 	local fs = {}
 	local edata = editor_data[session_name]
 	local project = projects[edata.pr_name]
