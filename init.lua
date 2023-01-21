@@ -366,7 +366,7 @@ local function show_export_window(player, session_name, pr_name)
 			if save_to_file(path , output_text) then
 				minetest.chat_send_player(player:get_player_name(), "Saved to  (modpath)" .. path)
 			else
-				minetest.chat_send_player(player:get_player_name(), "Filed to save file")
+				minetest.chat_send_player(player:get_player_name(), "Failed to save file")
 			end
 		end
 	end)
