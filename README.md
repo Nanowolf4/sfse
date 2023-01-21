@@ -1,1 +1,1 @@
-# Simple Formspec Editor
+# Simple FormSpec Editor
