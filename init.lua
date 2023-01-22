@@ -1,6 +1,6 @@
 -- Simple FormSpec Editor
 
--- Copyright (c) 2022 - 2023 Nanowolf4, (n4w@tutanota.com)
+-- Copyright (c) 2022 - 2023 Nanowolf4 (n4w@tutanota.com)
 -- License: GPLv3
 
 sfse = {}
@@ -137,10 +137,15 @@ local function main_gui(session_name)
 	add_elements({
 		{"label",  quick_add({0, -0.15}, last_pos), session_name},
 		{"image_button", el_pos(), el_size(btn_size), "sfse_export_btn.png", "export", ""},
-		{"dropdown", el_pos(), el_size({2.5, size_h}), "element", edata.elms_list, edata.selected, true},
+		{"dropdown", el_pos(), el_size({2.5, size_h}), "element", edata.elms_list, edata.el_selected, true},
 	})
 
-	local el = project[edata.selected]
+	table.insert(fs, {"image_button", el_pos(), el_size(btn_size), "sfse_add_new_btn.png", "add_new", ""})
+	table.insert(fs, {"image_button", el_pos(), el_size(btn_size), "sfse_add_new_btn.png^[colorize:blue:150", "add_copy", ""})
+
+	table.insert(fs, {"image_button", el_pos(), el_size(btn_size), "sfse_remove_btn.png", "remove_element", ""})
+
+	local el = project[edata.el_selected]
 	edata.xy_index = find_coords(el, "xy")
 	edata.wh_index = find_coords(el, "wh")
 
@@ -186,8 +191,8 @@ local function main_gui(session_name)
 	add_elements({
 		{"style", "show_text_editor", edata.show_text_editor and mode_on_color or btn_color, "bgimg=sfse_text_editor_btn.png"},
 		{"button",  el_pos(), el_size(btn_size), "show_text_editor", ""},
-		{"style", "quick_text_editor_btn", edata.quick_text_editor and mode_on_color or btn_color, "bgimg=sfse_single_line_editor_btn.png"},
-		{"button",  el_pos(), el_size(btn_size), "quick_text_editor_btn", ""},
+		{"style", "show_quick_text_editor_btn", edata.show_quick_text_editor and mode_on_color or btn_color, "bgimg=sfse_single_line_editor_btn.png"},
+		{"button",  el_pos(), el_size(btn_size), "show_quick_text_editor_btn", ""},
 
 		{"style", "move_toolbar_btn", edata.modes.move_toolbar and mode_on_color or btn_color, "bgimg=sfse_move_toolbar_btn.png"},
 		{"button", el_pos(), el_size(btn_size), "move_toolbar_btn", ""},
@@ -219,11 +224,11 @@ local function main_gui(session_name)
 		})
 	end
 
-	if edata.quick_text_editor then
+	if edata.show_quick_text_editor then
 		show_tb2()
 		add_elements({
 			{"button", el_pos(), el_size({3.5, size_h}), "quick_editor_submit", "Submit"},
-			{"field", window_pos, {window_size[1], size_h}, "quick_editor_field", "", minetest.formspec_escape(sfse.build_formspec({project[edata.selected]}))},
+			{"field", window_pos, {window_size[1], size_h}, "quick_editor_field", "", minetest.formspec_escape(sfse.build_formspec({project[edata.el_selected]}))},
 		})
 	end
 
@@ -281,7 +286,7 @@ end
 local function get_highlight(session_name)
 	local fs = {}
 	local edata = editor_data[session_name]
-	local el = projects[edata.pr_name][edata.selected]
+	local el = projects[edata.pr_name][edata.el_selected]
 	if edata.highlight_selected then
 		if edata.xy_index then
 			fs = {
@@ -387,10 +392,10 @@ function sfse.show_editor(player, pr_name)
 				resize = false,
 				move_toolbar = false,
 			},
-			selected = 1,
+			el_selected = 1,
 			step = 0.5,
 			toolbar_pos = {0, -0.7},
-			quick_text_editor = false,
+			show_quick_text_editor = false,
 			show_control_buttons = true,
 			show_mv_res_button = true,
 			show_text_editor = false,
@@ -429,9 +434,13 @@ function sfse.show_editor(player, pr_name)
 
 		local project = projects[pr_name]
 
-		local index = tonumber(fields.element)
+		local el_selected = tonumber(fields.element) or 1
 
-		if not project[index] then
+		if el_selected > #project or el_selected < 1 then
+			el_selected = #project
+		end
+
+		if not project[el_selected] then
 			return false
 		end
 
@@ -443,7 +452,7 @@ function sfse.show_editor(player, pr_name)
 			end
 		end
 
-		local el = project[index]
+		local el = project[el_selected]
 		local xy_index = edata.xy_index
 		local wh_index = edata.wh_index
 
@@ -460,7 +469,7 @@ function sfse.show_editor(player, pr_name)
 				if not xy_index then return end
 				el[xy_index][x_or_y(xy)] = el[xy_index][x_or_y(xy)] + value
 				update_project_layer = true
-				if edata.show_text_editor or edata.quick_text_editor then
+				if edata.show_text_editor or edata.show_quick_text_editor then
 					update_gui_layer = true
 				end
 			end,
@@ -468,7 +477,7 @@ function sfse.show_editor(player, pr_name)
 				if not wh_index then return end
 				el[wh_index][x_or_y(wh)] = el[wh_index][x_or_y(wh)] + value
 				update_project_layer = true
-				if edata.show_text_editor or edata.quick_text_editor  then
+				if edata.show_text_editor or edata.show_quick_text_editor  then
 					update_gui_layer = true
 				end
 			end,
@@ -481,7 +490,7 @@ function sfse.show_editor(player, pr_name)
 		local step = edata.step
 
 		if fields.quit then
-			return unescape(fss.project_formspec) .. fss.gui_formspec
+			return false
 		elseif fields.button_1 then
 			mode[mode_name](-step, "x")
 		elseif fields.button_2 then
@@ -498,12 +507,12 @@ function sfse.show_editor(player, pr_name)
 			edata.modes.resize = not edata.modes.resize
 			update_gui_layer = true
 
-		elseif fields.quick_text_editor_btn then
-			edata.quick_text_editor = not edata.quick_text_editor
+		elseif fields.show_quick_text_editor_btn then
+			edata.show_quick_text_editor = not edata.show_quick_text_editor
 			edata.show_text_editor = false
 			update_gui_layer = true
 		elseif fields.quick_editor_submit then
-			project[edata.selected] = sfse.formspec_to_table(fields.quick_editor_field)[1]
+			project[el_selected] = sfse.formspec_to_table(fields.quick_editor_field)[1]
 			update_project_layer = true
 			update_gui_layer = true
 
@@ -514,16 +523,16 @@ function sfse.show_editor(player, pr_name)
 
 		elseif fields.show_text_editor then
 			edata.show_text_editor = not edata.show_text_editor
-			edata.quick_text_editor = false
+			edata.show_quick_text_editor = false
 			update_gui_layer = true
 		elseif fields.submit then
 			if fields.text_editor then
 				local newl = check_default_elements(sfse.formspec_to_table(fields.text_editor))
-				if str_index then
-					projects[pr_name][str_index] = newl[1]
-				else
+				-- if str_index then
+				-- 	projects[pr_name][str_index] = newl[1]
+				-- else
 					projects[pr_name] = newl
-				end
+				-- end
 				update_project_layer = true
 				update_gui_layer = true
 			end
@@ -532,7 +541,7 @@ function sfse.show_editor(player, pr_name)
 			generate_all()
 			sfse.close_formspec(player)
 			minetest.after(0.1, sfse.show_editor, player, pr_name)
-			return
+			return false
 
 		elseif fields.submit_step then
 			edata.step = tonumber(fields.set_step)
@@ -541,6 +550,35 @@ function sfse.show_editor(player, pr_name)
 		elseif fields.text_editor_no_trans then
 			edata.text_editor_show_background = not edata.text_editor_show_background
 			update_gui_layer = true
+
+		elseif fields.add_new then
+			table.insert(project, {"name"})
+			el_selected = #project
+			if not edata.show_text_editor then
+				edata.show_quick_text_editor = true
+			end
+			update_project_layer = true
+		elseif fields.add_copy then
+			if el_selected > 2 then
+				table.insert(project, el_selected, table.copy(el))
+				if not edata.show_text_editor then
+					edata.show_quick_text_editor = true
+				end
+				update_project_layer = true
+				update_gui_layer = true
+			else
+				minetest.chat_send_player(name, "New elements can be added after 2 only")
+			end
+
+		elseif fields.remove_element then
+			if el_selected > 2 then
+				table.remove(project, el_selected)
+				el_selected = el_selected - 1
+				update_project_layer = true
+			else
+				minetest.chat_send_player(name, (el[1] or "[unknown_element]") .. " cannot be removed.")
+			end
+
 		elseif fields.exit then
 			local exit_fs = {
 				{"formspec_version", 6},
@@ -555,24 +593,20 @@ function sfse.show_editor(player, pr_name)
 					editor_data[session_name] = nil
 					formspec_data[session_name] = nil
 					sfse.close_formspec(player)
-					return
+					return false
 				elseif fields.back or fields.quit then
 					sfse.show_editor(player, edata.pr_name)
 				end
 			end)
 		end
 
-		if edata.selected ~= index then
-			edata.selected = index
+		if edata.el_selected ~= el_selected then
+			edata.el_selected = el_selected
 			update_gui_layer = true
 		end
 
-		if edata.selected > #projects[pr_name] then
-			edata.selected = #projects[pr_name]
-		end
-
 		if not update_gui_layer and not update_project_layer then
-			return
+			return false
 		end
 
 		if update_project_layer then
