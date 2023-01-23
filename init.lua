@@ -25,7 +25,13 @@ local projects = sfse.projects or {}
 minetest.register_on_mods_loaded(function()
 	for n, fs in pairs(projects) do
 		if type(fs) == "string" then
-			projects[n] = sfse.formspec_to_table(fs)
+			local fstable, err = sfse.formspec_to_table(fs)
+			if err then
+				minetest.log("warning", "sfse: '" .. n .. "' has a syntax error.")
+				projects[n] = nil
+			else
+				projects[n] = fstable
+			end
 		end
 	end
 end)
@@ -34,7 +40,12 @@ function sfse.open_formspec(playername, formname, formspec)
 	assert(playername, "Missing player name!")
 	assert(formname, "Missing formname!")
 	if (formspec) and formspec ~= "" then
-		projects[formname] = sfse.formspec_to_table(formspec or "")
+		local fstable, err = sfse.formspec_to_table(formspec)
+		if err then
+			minetest.chat_send_player(playername, "Syntax error! You may have missed a square bracket")
+		else
+			projects[formname] = fstable
+		end
 	end
 	sfse.show_editor(minetest.get_player_by_name(playername), formname)
 end
@@ -512,9 +523,20 @@ function sfse.show_editor(player, pr_name)
 			edata.show_text_editor = false
 			update_gui_layer = true
 		elseif fields.quick_editor_submit then
-			project[el_selected] = sfse.formspec_to_table(fields.quick_editor_field)[1]
+			if fields.quick_editor_field:match("%S") then
+				local fstable, err = sfse.formspec_to_table(fields.quick_editor_field)
+				if err then
+					minetest.chat_send_player(name, "Syntax error! You may have missed a square bracket")
+				elseif fstable[1] then
+					project[el_selected] = fstable[1]
+					update_gui_layer = true
+				end
+			else
+				table.remove(project, el_selected)
+				el_selected = #project
+				update_gui_layer = true
+			end
 			update_project_layer = true
-			update_gui_layer = true
 
 		elseif fields.move_toolbar_btn then
 			edata.modes.resize = false
@@ -527,13 +549,15 @@ function sfse.show_editor(player, pr_name)
 			update_gui_layer = true
 		elseif fields.submit then
 			if fields.text_editor then
-				local newl = check_default_elements(sfse.formspec_to_table(fields.text_editor))
-				-- if str_index then
-				-- 	projects[pr_name][str_index] = newl[1]
-				-- else
-					projects[pr_name] = newl
-				-- end
-				update_project_layer = true
+				local fstable, err = sfse.formspec_to_table(fields.text_editor)
+				if err then
+					minetest.chat_send_player(name, "Syntax error! You may have missed a square bracket")
+				else
+					projects[pr_name] = check_default_elements(fstable)
+					el_selected = #projects[pr_name]
+					update_project_layer = true
+				end
+
 				update_gui_layer = true
 			end
 
@@ -567,7 +591,7 @@ function sfse.show_editor(player, pr_name)
 				update_project_layer = true
 				update_gui_layer = true
 			else
-				minetest.chat_send_player(name, "New elements can be added after 2 only")
+				minetest.chat_send_player(name, "New elements can be added after size[] only")
 			end
 
 		elseif fields.remove_element then

@@ -1,28 +1,43 @@
-local eschar = "\\"
+local eschars = {"\\", "^"}
 
 local function match_unescaped(str, i, pattern)
-    if str:sub(i - #eschar, i - 1) ~= eschar and str:sub(i, i) == pattern then
-		return true
-    end
+	local escaped = false
+	for _, escc in ipairs(eschars) do
+		if str:sub(i - #escc, i) == escc .. pattern then
+			return false
+		end
+	end
+	return str:sub(i, i) == pattern
 end
 
-function sfse.split_formspec(str, d1, d2)
+function sfse.split_formspec(str)
+	local d1, d2 = "[", "]"
 	local name = {}
 	local data = {}
 	local name_pos = {}
 	local data_pos = {}
 	local i = 1
 	local data_found = false
+	local err = false
 
 	for i = 1, #str do
-		if not (data_pos[1]) and match_unescaped(str, i, d1) then
+
+		if match_unescaped(str, i, d1) then
+			if data_pos[1] then
+				err = true
+				break
+			end
 			data_pos[1] = i
-		elseif (data_pos[1]) and match_unescaped(str, i, d2) then
-			data_pos[2] = i
 			data_found = true
+		elseif match_unescaped(str, i, d2) then
+			if data_pos[2] or not data_pos[1] then
+				err = true
+				break
+			end
+			data_pos[2] = i
 		end
 
-		if #data_pos == 0 then
+		if not data_found then
 			if not name_pos[1] then
 				name_pos[1] = i
 			else
@@ -30,7 +45,7 @@ function sfse.split_formspec(str, d1, d2)
 			end
 		end
 
-		if data_found and #name_pos == 2 then
+		if #name_pos == 2 and #data_pos == 2 then
 			table.insert(name, str:sub(name_pos[1], name_pos[2]))
 			table.insert(data, str:sub(data_pos[1] + 1, data_pos[2] - 1))
 			data_found = false
@@ -39,12 +54,12 @@ function sfse.split_formspec(str, d1, d2)
 			end
 			name_pos = {}
         end
-
 	end
-	return name, data
+
+	return name, data, err
 end
 
-local function unEsc_split(str, delim)
+function sfse.unEsc_split(str, delim)
 	local items = {}
 	local pos = {}
 	local i = 1
@@ -69,17 +84,24 @@ local function unEsc_split(str, delim)
 end
 
 function sfse.formspec_to_table(formspec)
-	assert(formspec)
-	local fs_type, data = sfse.split_formspec(formspec, "[", "]")
+	assert(type(formspec) == "string")
 
+	local fs_type, data, missing_bracket = sfse.split_formspec(formspec)
+	if missing_bracket then
+		return nil, true
+	end
 	local num_match_pattern = "%d*%.?%d*"
 	local elements = {}
 	for i = 1, #fs_type do
 		local tmp = {}
 		table.insert(tmp, fs_type[i]:match("%S*$") or "unknown_element")
-		local params_rope = unEsc_split(data[i], ";")
+
+		local params_rope = sfse.unEsc_split(data[i], ";")
+
 		for _, v in ipairs(params_rope) do
-			local param = unEsc_split(v, ",")
+
+			local param = sfse.unEsc_split(v, ",")
+
 			if #param >= 2 then
 
 				local pnum1 = tonumber(param[1]:match(num_match_pattern))
@@ -107,8 +129,9 @@ function sfse.formspec_to_table(formspec)
 			end
 			:: next ::
 		end
+
 		table.insert(elements, tmp)
 	end
 
-	return elements
+	return elements, false
 end
