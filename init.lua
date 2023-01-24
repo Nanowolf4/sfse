@@ -148,7 +148,7 @@ local function main_gui(session_name)
 	add_elements({
 		{"label",  quick_add({0, -0.15}, last_pos), session_name},
 		{"image_button", el_pos(), el_size(btn_size), "sfse_export_btn.png", "export", ""},
-		{"dropdown", el_pos(), el_size({2.5, size_h}), "element", edata.elms_list, edata.el_selected, true},
+		{"dropdown", el_pos(), el_size({2.5, size_h}), "element", edata.elms_list, edata.selected_el, true},
 	})
 
 	table.insert(fs, {"image_button", el_pos(), el_size(btn_size), "sfse_add_new_btn.png", "add_new", ""})
@@ -156,7 +156,7 @@ local function main_gui(session_name)
 
 	table.insert(fs, {"image_button", el_pos(), el_size(btn_size), "sfse_remove_btn.png", "remove_element", ""})
 
-	local el = project[edata.el_selected]
+	local el = project[edata.selected_el]
 	edata.xy_index = find_coords(el, "xy")
 	edata.wh_index = find_coords(el, "wh")
 
@@ -239,7 +239,7 @@ local function main_gui(session_name)
 		show_tb2()
 		add_elements({
 			{"button", el_pos(), el_size({3.5, size_h}), "quick_editor_submit", "Submit"},
-			{"field", window_pos, {window_size[1], size_h}, "quick_editor_field", "", minetest.formspec_escape(sfse.build_formspec({project[edata.el_selected]}))},
+			{"field", window_pos, {window_size[1], size_h}, "quick_editor_field", "", minetest.formspec_escape(sfse.build_formspec({project[edata.selected_el]}))},
 		})
 	end
 
@@ -297,7 +297,7 @@ end
 local function get_highlight(session_name)
 	local fs = {}
 	local edata = editor_data[session_name]
-	local el = projects[edata.pr_name][edata.el_selected]
+	local el = projects[edata.pr_name][edata.selected_el]
 	if edata.highlight_selected then
 		if edata.xy_index then
 			fs = {
@@ -403,7 +403,7 @@ function sfse.show_editor(player, pr_name)
 				resize = false,
 				move_toolbar = false,
 			},
-			el_selected = 1,
+			selected_el = 1,
 			step = 0.5,
 			toolbar_pos = {0, -0.7},
 			show_quick_text_editor = false,
@@ -435,6 +435,17 @@ function sfse.show_editor(player, pr_name)
 		return unescape(fss.project_formspec) .. "\n\n" ..  fss.highlight .. "\n\n" .. fss.gui_formspec
 	end
 
+	local project = projects[pr_name]
+
+	local function check_selected_index(sel_index, to_near_index)
+		local pr_len = #projects[pr_name]
+		if sel_index > pr_len or sel_index < 1 then
+			return pr_len
+		else
+			return sel_index
+		end
+	end
+
 	sfse.show_formspec(player, get_formspec(), function(fields)
 		if not minetest.check_player_privs(player, privs_req) then
 			minetest.chat_send_player(name, "sfse: Are you hacker?")
@@ -443,15 +454,10 @@ function sfse.show_editor(player, pr_name)
 		local update_gui_layer = false
 		local update_project_layer = false
 
-		local project = projects[pr_name]
 
-		local el_selected = tonumber(fields.element) or 1
+		local selected_el = check_selected_index(tonumber(fields.element) or 1)
 
-		if el_selected > #project or el_selected < 1 then
-			el_selected = #project
-		end
-
-		if not project[el_selected] then
+		if not project[selected_el] then
 			return false
 		end
 
@@ -463,7 +469,7 @@ function sfse.show_editor(player, pr_name)
 			end
 		end
 
-		local el = project[el_selected]
+		local cur_element = project[selected_el]
 		local xy_index = edata.xy_index
 		local wh_index = edata.wh_index
 
@@ -478,7 +484,7 @@ function sfse.show_editor(player, pr_name)
 		local mode = {
 			move = function(value, xy)
 				if not xy_index then return end
-				el[xy_index][x_or_y(xy)] = el[xy_index][x_or_y(xy)] + value
+				cur_element[xy_index][x_or_y(xy)] = cur_element[xy_index][x_or_y(xy)] + value
 				update_project_layer = true
 				if edata.show_text_editor or edata.show_quick_text_editor then
 					update_gui_layer = true
@@ -486,7 +492,7 @@ function sfse.show_editor(player, pr_name)
 			end,
 			resize = function(value, wh)
 				if not wh_index then return end
-				el[wh_index][x_or_y(wh)] = el[wh_index][x_or_y(wh)] + value
+				cur_element[wh_index][x_or_y(wh)] = cur_element[wh_index][x_or_y(wh)] + value
 				update_project_layer = true
 				if edata.show_text_editor or edata.show_quick_text_editor  then
 					update_gui_layer = true
@@ -528,12 +534,12 @@ function sfse.show_editor(player, pr_name)
 				if err then
 					minetest.chat_send_player(name, "Syntax error! You may have missed a square bracket")
 				elseif fstable[1] then
-					project[el_selected] = fstable[1]
+					project[selected_el] = fstable[1]
 					update_gui_layer = true
 				end
 			else
-				table.remove(project, el_selected)
-				el_selected = #project
+				table.remove(project, selected_el)
+				selected_el = check_selected_index(selected_el)
 				update_gui_layer = true
 			end
 			update_project_layer = true
@@ -554,10 +560,9 @@ function sfse.show_editor(player, pr_name)
 					minetest.chat_send_player(name, "Syntax error! You may have missed a square bracket")
 				else
 					projects[pr_name] = check_default_elements(fstable)
-					el_selected = #projects[pr_name]
 					update_project_layer = true
 				end
-
+				selected_el = check_selected_index(selected_el)
 				update_gui_layer = true
 			end
 
@@ -577,14 +582,14 @@ function sfse.show_editor(player, pr_name)
 
 		elseif fields.add_new then
 			table.insert(project, {"name"})
-			el_selected = #project
+			selected_el = #project
 			if not edata.show_text_editor then
 				edata.show_quick_text_editor = true
 			end
 			update_project_layer = true
 		elseif fields.add_copy then
-			if el_selected > 2 then
-				table.insert(project, el_selected, table.copy(el))
+			if selected_el > 2 then
+				table.insert(project, selected_el, table.copy(cur_element))
 				if not edata.show_text_editor then
 					edata.show_quick_text_editor = true
 				end
@@ -595,12 +600,12 @@ function sfse.show_editor(player, pr_name)
 			end
 
 		elseif fields.remove_element then
-			if el_selected > 2 then
-				table.remove(project, el_selected)
-				el_selected = el_selected - 1
+			if selected_el > 2 then
+				table.remove(project, selected_el)
+				selected_el = selected_el - 1
 				update_project_layer = true
 			else
-				minetest.chat_send_player(name, (el[1] or "[unknown_element]") .. " cannot be removed.")
+				minetest.chat_send_player(name, (cur_element[1] or "[unknown_element]") .. " cannot be removed.")
 			end
 
 		elseif fields.exit then
@@ -624,8 +629,9 @@ function sfse.show_editor(player, pr_name)
 			end)
 		end
 
-		if edata.el_selected ~= el_selected then
-			edata.el_selected = el_selected
+
+		if selected_el ~= edata.selected_el then
+			edata.selected_el = selected_el
 			update_gui_layer = true
 		end
 
