@@ -419,20 +419,20 @@ function sfse.show_editor(player, pr_name)
 	end
 
 	local edata = editor_data[session_name]
-	local fss = formspec_data[session_name]
+	local fsd = formspec_data[session_name]
 
 	local function generate_all()
-		fss.project_formspec = sfse.build_formspec(build_project(session_name))
-		fss.gui_formspec = sfse.build_formspec(main_gui(session_name))
-		fss.highlight = edata.highlight_selected and sfse.build_formspec(get_highlight(session_name)) or ""
+		fsd.project_formspec = sfse.build_formspec(build_project(session_name))
+		fsd.gui_formspec = sfse.build_formspec(main_gui(session_name))
+		fsd.highlight = edata.highlight_selected and sfse.build_formspec(get_highlight(session_name)) or ""
 	end
 
 	local function get_formspec()
-		local fss = formspec_data[session_name]
-		if not (fss.project_formspec or fss.gui_formspec) then
+		local fsd = formspec_data[session_name]
+		if not (fsd.project_formspec or fsd.gui_formspec) then
 			generate_all()
 		end
-		return unescape(fss.project_formspec) .. "\n\n" ..  fss.highlight .. "\n\n" .. fss.gui_formspec
+		return unescape(fsd.project_formspec) .. "\n\n" ..  fsd.highlight .. "\n\n" .. fsd.gui_formspec
 	end
 
 	local project = projects[pr_name]
@@ -560,7 +560,9 @@ function sfse.show_editor(player, pr_name)
 					minetest.chat_send_player(name, "Syntax error! You may have missed a square bracket")
 				else
 					projects[pr_name] = check_default_elements(fstable)
-					update_project_layer = true
+					generate_all()
+					sfse.show_editor(player, pr_name)
+					return false
 				end
 				selected_el = check_selected_index(selected_el)
 				update_gui_layer = true
@@ -640,13 +642,13 @@ function sfse.show_editor(player, pr_name)
 		end
 
 		if update_project_layer then
-			fss.project_formspec = sfse.build_formspec(build_project(session_name))
+			fsd.project_formspec = sfse.build_formspec(build_project(session_name))
 		end
 		if update_gui_layer then
-			fss.gui_formspec = sfse.build_formspec(main_gui(session_name))
+			fsd.gui_formspec = sfse.build_formspec(main_gui(session_name))
 		end
 		if edata.highlight_selected then
-			fss.highlight = sfse.build_formspec(get_highlight(session_name))
+			fsd.highlight = sfse.build_formspec(get_highlight(session_name))
 		end
 
 		return get_formspec()
