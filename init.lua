@@ -157,6 +157,7 @@ local function main_gui(session_name)
 	table.insert(fs, {"image_button", el_pos(), el_size(btn_size), "sfse_remove_btn.png", "remove_element", ""})
 
 	local el = project[edata.selected_el]
+	if not el then return end
 	edata.xy_index = find_coords(el, "xy")
 	edata.wh_index = find_coords(el, "wh")
 
