@@ -39,16 +39,18 @@ end)
 function sfse.open_formspec(playername, formname, formspec)
 	assert(playername, "Missing player name!")
 	assert(formname, "Missing formname!")
-	if (formspec) and formspec ~= "" then
+    if (formspec) and formspec ~= "" then
         local fstable, err = sfse.formspec_to_table(formspec)
 
-		if err then
-			core.chat_send_player(playername, "Syntax error! You may have missed a square bracket")
-		else
-			projects[formname] = fstable
-		end
-	end
-	sfse.show_editor(core.get_player_by_name(playername), formname)
+        if err then
+            core.chat_send_player(playername, "Syntax error! You may have missed a square bracket")
+        else
+            projects[formname] = fstable
+        end
+    end
+	core.after(0.1, function()
+		sfse.show_editor(core.get_player_by_name(playername), formname)
+	end)
 end
 
 local default_elements = {
@@ -212,6 +214,14 @@ local function main_gui(session_name)
 		{"image_button", el_pos(), el_size(btn_size), "sfse_reload_btn.png", "force_update", ""},
 		{"image_button", el_pos(), el_size(btn_size), "sfse_exit_button.png", "exit", ""},
 	})
+
+	if edata.show_control_buttons then
+		blank_space[1] = 0.1
+		local align_btn_w = 0.5
+		table.insert(fs, {"button", el_pos(), el_size({align_btn_w, size_h}), "align_left", "L"})
+		table.insert(fs, {"button", el_pos(), el_size({align_btn_w, size_h}), "align_center", "C"})
+		table.insert(fs, {"button", el_pos(), el_size({align_btn_w, size_h}), "align_right", "R"})
+	end
 
 	local window_pos = {0, 0}
 	local window_size = {panel_size[1], 6}
@@ -387,6 +397,15 @@ local function show_export_window(player, session_name, pr_name)
 			end
 		end
 	end)
+end
+
+local function get_formspec_width(project)
+	for _, el in ipairs(project) do
+		if el[1] == "size" and type(el[2]) == "table" and type(el[2][1]) == "number" then
+			return el[2][1]
+		end
+	end
+	return 12
 end
 
 function sfse.show_editor(player, pr_name)
@@ -631,8 +650,26 @@ function sfse.show_editor(player, pr_name)
 					sfse.show_editor(player, edata.pr_name)
 				end
 			end)
+		elseif fields.align_left then
+			if xy_index then
+				cur_element[xy_index][1] = 0
+				update_project_layer = true
+			end
+		elseif fields.align_center then
+			if xy_index and wh_index then
+				local fs_width = get_formspec_width(project)
+				local el_width = cur_element[wh_index][1] or 0
+				cur_element[xy_index][1] = (fs_width - el_width) / 2
+				update_project_layer = true
+			end
+		elseif fields.align_right then
+			if xy_index and wh_index then
+				local fs_width = get_formspec_width(project)
+				local el_width = cur_element[wh_index][1] or 0
+				cur_element[xy_index][1] = fs_width - el_width
+				update_project_layer = true
+			end
 		end
-
 
 		if selected_el ~= edata.selected_el then
 			edata.selected_el = selected_el
