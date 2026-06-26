@@ -107,14 +107,14 @@ function sfse.show_formspec(player, formspec, handler)
 	}
 	id = id + 1
 	if id > max_id then id = 1 end
-	minetest.show_formspec(player_name, formspec_name, formspec)
+	minetest.show_formspec(player_name, formspec_name, formspec, true)
 	return formspec_name
 end
 
 function sfse.reshow_formspec(player, formspec_name, formspec)
 	local player_name = player:get_player_name()
 	assert(formspecs[player_name].name == formspec_name)
-	minetest.show_formspec(player_name, formspec_name, sfse.build_formspec(formspec))
+	minetest.show_formspec(player_name, formspec_name, sfse.build_formspec(formspec), true)
 end
 
 function sfse.close_formspec(player)
@@ -136,7 +136,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		if fields.quit then
 			sfse.show_formspec(player, updated_formspec, formspec.handler)
 		else
-			minetest.show_formspec(player_name, formspec.name, sfse.build_formspec(updated_formspec))
+			minetest.show_formspec(player_name, formspec.name, sfse.build_formspec(updated_formspec), true)
 		end
 	end
 	return true -- don't call remaining functions

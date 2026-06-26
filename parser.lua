@@ -61,25 +61,15 @@ end
 
 function sfse.unEsc_split(str, delim)
 	local items = {}
-	local pos = {}
-	local i = 1
-	local first = true
+	local prev_pos = 1
 	local str_len = #str
 	for i = 1, str_len do
-
-		if (i == 1) or match_unescaped(str, i, delim) then
-			table.insert(pos, i)
+		if match_unescaped(str, i, delim) then
+			table.insert(items, str:sub(prev_pos, i - 1))
+			prev_pos = i + 1
 		end
-
-		if #pos == 2 or i == str_len then
-			table.insert(items, str:sub(first and pos[1] or pos[1] + 1, i ~= str_len and pos[2] - 1 or pos[2]))
-			pos[1] = pos[2]
-			pos[2] = nil
-			first = false
-		end
-
 	end
-
+	table.insert(items, str:sub(prev_pos))
 	return items
 end
 
@@ -90,7 +80,7 @@ function sfse.formspec_to_table(formspec)
 	if missing_bracket then
 		return nil, true
 	end
-	local num_match_pattern = "%d*%.?%d*"
+	local num_match_pattern = "%-?%d*%.?%d*"
 	local elements = {}
 	for i = 1, #fs_type do
 		local tmp = {}
@@ -108,26 +98,28 @@ function sfse.formspec_to_table(formspec)
 				local pnum2 = tonumber(param[2]:match(num_match_pattern))
 
 				if type(pnum1) == "number" or type(pnum2) == "number" then
-					table.insert(tmp, pnum1 and pnum2 and {pnum1, pnum2} or pnum1)
-					goto next
+					if pnum1 and pnum2 then
+						table.insert(tmp, {pnum1, pnum2})
+					else
+						table.insert(tmp, pnum1)
+					end
+					goto continue
 				end
 
-				local bool1, bool2 = param[1]:match("(%S+)[%s+]?=[%s+]?(%S+)")
-				if (bool1) and bool2 == "true" or bool2 == "false" then
-					table.insert(tmp, bool1 .. "=" .. bool2)
-					goto next
+				local key, value = param[1]:match("(%S+)%s*=%s*(%S+)")
+				if key and (value == "true" or value == "false") then
+					table.insert(tmp, key .. "=" .. value)
+					goto continue
 				end
 
 				table.insert(tmp, param)
 
 			elseif param[1] then
 				table.insert(tmp, param[1])
-			else
-				if #param == 0 then
-					table.insert(tmp, "")
-				end
+			elseif #param == 0 then
+				table.insert(tmp, "")
 			end
-			:: next ::
+			:: continue ::
 		end
 
 		table.insert(elements, tmp)

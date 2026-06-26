@@ -40,14 +40,15 @@ function sfse.open_formspec(playername, formname, formspec)
 	assert(playername, "Missing player name!")
 	assert(formname, "Missing formname!")
 	if (formspec) and formspec ~= "" then
-		local fstable, err = sfse.formspec_to_table(formspec)
+        local fstable, err = sfse.formspec_to_table(formspec)
+
 		if err then
-			minetest.chat_send_player(playername, "Syntax error! You may have missed a square bracket")
+			core.chat_send_player(playername, "Syntax error! You may have missed a square bracket")
 		else
 			projects[formname] = fstable
 		end
 	end
-	sfse.show_editor(minetest.get_player_by_name(playername), formname)
+	sfse.show_editor(core.get_player_by_name(playername), formname)
 end
 
 local default_elements = {
@@ -656,21 +657,21 @@ function sfse.show_editor(player, pr_name)
 	end)
 end
 
-minetest.register_chatcommand("fse_open", {
+minetest.register_chatcommand("fsopen", {
 	privs = privs_req,
 	func = function(name, param)
 		if param == "" then
 			return false, "Project name is missing"
 		end
 		if projects[param] then
-			sfse.show_editor(minetest.get_player_by_name(name), param)
+			sfse.show_editor(core.get_player_by_name(name), param)
 		else
 			return false, "This project does not exist"
 		end
 	end,
 })
 
-minetest.register_chatcommand("fse", {
+minetest.register_chatcommand("fseditor", {
 	privs = privs_req,
 	func = function(name, param)
 		if param == "" then
@@ -680,7 +681,85 @@ minetest.register_chatcommand("fse", {
 		if not projects[param] then
 			sfse.open_formspec(name, param)
 		else
-			sfse.show_editor(minetest.get_player_by_name(name), param)
+			sfse.show_editor(core.get_player_by_name(name), param)
+		end
+	end,
+})
+
+-- Interception system
+sfse.intercept = {}
+
+local orig_show_formspec = core.show_formspec
+
+function core.show_formspec(player_name, formname, formspec, skip_intercept)
+	if skip_intercept then
+		return orig_show_formspec(player_name, formname, formspec)
+	end
+
+	local pdata = sfse.intercept[player_name]
+	local should_intercept = false
+
+	if pdata then
+		if pdata.next then
+			pdata.next = false
+			should_intercept = true
+		end
+		if not should_intercept and pdata.formnames[formname] then
+			should_intercept = true
+		end
+	end
+
+    if should_intercept then
+        sfse.open_formspec(player_name, formname, formspec)
+        return true
+    end
+
+	return orig_show_formspec(player_name, formname, formspec)
+end
+
+minetest.register_chatcommand("fs_capture_next", {
+	privs = privs_req,
+	func = function(name, param)
+		sfse.intercept[name] = sfse.intercept[name] or { formnames = {} }
+		sfse.intercept[name].next = not sfse.intercept[name].next
+		local state = sfse.intercept[name].next and "enabled" or "disabled"
+		return true, "Next-capture mode " .. state
+	end,
+})
+
+minetest.register_chatcommand("fs_capture", {
+	privs = privs_req,
+	func = function(name, param)
+		if param == "" then
+			local pdata = sfse.intercept[name]
+			if pdata and next(pdata.formnames) then
+				local list = {}
+				for fn in pairs(pdata.formnames) do
+					table.insert(list, fn)
+				end
+				return true, "Captured formnames: " .. table.concat(list, ", ")
+			else
+				return false, "No formnames captured. Usage: /fs_capture <formname>"
+			end
+		end
+		sfse.intercept[name] = sfse.intercept[name] or { formnames = {} }
+		sfse.intercept[name].formnames[param] = true
+		return true, "Now capturing: " .. param
+	end,
+})
+
+minetest.register_chatcommand("fs_uncapture", {
+	privs = privs_req,
+	func = function(name, param)
+		if param == "" then
+			return false, "Usage: /fs_uncapture <formname>"
+		end
+		local pdata = sfse.intercept[name]
+		if pdata and pdata.formnames[param] then
+			pdata.formnames[param] = nil
+			return true, "Stopped capturing: " .. param
+		else
+			return false, param .. " is not being captured"
 		end
 	end,
 })
