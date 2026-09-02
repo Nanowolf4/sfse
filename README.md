@@ -2,6 +2,10 @@
 
 SFSE (**S**imple **F**orm**S**pec **E**ditor) is a Luanti mod created to make formspec development much faster and easier for Luanti mod authors. Instead of the usual "write code -> restart/test -> fix positions blindly" loop, SFSE lets you edit a formspec **in real time, right inside the running game**: every change you make is applied to the live rendering of the form immediately, following the *"do it — see it"* principle.
 
+## Screenshot
+
+![SFSE in action — editing a formspec live inside the game](screenshot.png)
+
 ## What it does
 
 The mod is an in-game visual editor for [Formspec](https://github.com/luanti-org/luanti/blob/master/doc/lua_api.md#formspecs) (Luanti's GUI description language). While you work, the actual form is rendered as it would appear in your mod, with an editor toolbar, selection handles and helpers layered on top of it.
