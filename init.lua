@@ -7,6 +7,7 @@ sfse = {}
 
 local editor_data = {}
 local formspec_data = {}
+local last_sessions = {}
 
 
 minetest.register_privilege("formspec_editor", {
@@ -209,6 +210,9 @@ local function main_gui(session_name)
 		{"style", "show_quick_text_editor_btn", edata.show_quick_text_editor and mode_on_color or btn_color, "bgimg=sfse_single_line_editor_btn.png"},
 		{"button",  el_pos(), el_size(btn_size), "show_quick_text_editor_btn", ""},
 
+		{"style", "show_formname_editor_btn", edata.show_formname_editor and mode_on_color or btn_color},
+		{"button", el_pos(), el_size(btn_size), "show_formname_editor_btn", "Nm"},
+
 		{"style", "move_toolbar_btn", edata.modes.move_toolbar and mode_on_color or btn_color, "bgimg=sfse_move_toolbar_btn.png"},
 		{"button", el_pos(), el_size(btn_size), "move_toolbar_btn", ""},
 		{"image_button", el_pos(), el_size(btn_size), "sfse_reload_btn.png", "force_update", ""},
@@ -252,6 +256,15 @@ local function main_gui(session_name)
 		add_elements({
 			{"button", el_pos(), el_size({3.5, size_h}), "quick_editor_submit", "Submit"},
 			{"field", window_pos, {window_size[1], size_h}, "quick_editor_field", "", minetest.formspec_escape(sfse.build_formspec({project[edata.selected_el]}))},
+		})
+	end
+
+	if edata.show_formname_editor then
+		show_tb2()
+		add_elements({
+			{"tooltip", "formname_editor_submit", "Warning: other mods may depend on the current formname"},
+			{"button", el_pos(), el_size({3.5, size_h}), "formname_editor_submit", "Rename"},
+			{"field", window_pos, {window_size[1], size_h}, "formname_editor_field", "", edata.pr_name},
 		})
 	end
 
@@ -416,6 +429,7 @@ function sfse.show_editor(player, pr_name)
 		projects[pr_name] = default_elements
 	end
 
+	-- Init session
 	if not editor_data[session_name] then
 		editor_data[session_name] = {
 			pr_name = pr_name,
@@ -433,10 +447,12 @@ function sfse.show_editor(player, pr_name)
 			show_text_editor = false,
 			elms_list = {},
 			text_editor_show_background = true,
-			highlight_selected = true
+			highlight_selected = true,
+			show_formname_editor = false,
 		}
 
-		formspec_data[session_name] = {}
+        formspec_data[session_name] = {}
+		table.insert(last_sessions, 1, pr_name)
 	end
 
 	local edata = editor_data[session_name]
@@ -549,6 +565,9 @@ function sfse.show_editor(player, pr_name)
 			edata.show_quick_text_editor = not edata.show_quick_text_editor
 			edata.show_text_editor = false
 			update_gui_layer = true
+		elseif fields.show_formname_editor_btn then
+			edata.show_formname_editor = not edata.show_formname_editor
+			update_gui_layer = true
 		elseif fields.quick_editor_submit then
 			if fields.quick_editor_field:match("%S") then
 				local fstable, err = sfse.formspec_to_table(fields.quick_editor_field)
@@ -564,6 +583,18 @@ function sfse.show_editor(player, pr_name)
 				update_gui_layer = true
 			end
 			update_project_layer = true
+
+		elseif fields.formname_editor_submit then
+			local new_name = fields.formname_editor_field
+			if new_name and new_name ~= "" and new_name ~= edata.pr_name then
+				projects[new_name] = projects[edata.pr_name]
+				projects[edata.pr_name] = nil
+				editor_data[session_name] = nil
+				formspec_data[session_name] = nil
+				sfse.close_formspec(player)
+				minetest.after(0.1, sfse.show_editor, player, new_name)
+				return false
+			end
 
 		elseif fields.move_toolbar_btn then
 			edata.modes.resize = false
@@ -696,7 +727,12 @@ end
 
 minetest.register_chatcommand("fsopen", {
 	privs = privs_req,
-	func = function(name, param)
+    func = function(name, param)
+		-- open last project
+        if param == "!" then
+            param = last_sessions[1]
+        end
+
 		if param == "" then
 			return false, "Project name is missing"
 		end
@@ -704,21 +740,6 @@ minetest.register_chatcommand("fsopen", {
 			sfse.show_editor(core.get_player_by_name(name), param)
 		else
 			return false, "This project does not exist"
-		end
-	end,
-})
-
-minetest.register_chatcommand("fseditor", {
-	privs = privs_req,
-	func = function(name, param)
-		if param == "" then
-			return false, "Project name is missing"
-		end
-
-		if not projects[param] then
-			sfse.open_formspec(name, param)
-		else
-			sfse.show_editor(core.get_player_by_name(name), param)
 		end
 	end,
 })
